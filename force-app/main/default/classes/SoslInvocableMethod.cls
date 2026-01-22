@@ -2,45 +2,44 @@ public with sharing class SoslInvocableMethod {
 
     @InvocableMethod
     public static List<Result> execute(List<Request> requestList) {
-        // Init the response
         List<Result> response = new List<Result>();
 
-        // For each request
         for (Request req : requestList) {
-
-            System.debug('### SoslInvocableMethod execute req >>>'+req);
             
-            // Sanitize and Escape our queries
-            List<String> escapedQueries = new List<String>();
-            for (String query : req.queries) {
-                String escaped = escapeSoslReservedChars(query);
-                escaped = String.escapeSingleQuotes(escaped);
-                escapedQueries.add(escaped);
+            // 1. Sanitize, Escape, and Quote each individual query term
+            List<String> formattedQueries = new List<String>();
+            
+            // Handle edge case where queries list might be null
+            if(req.queries != null) {
+                for (String query : req.queries) {
+                    if (String.isNotBlank(query)) {
+                        String escaped = escapeSoslReservedChars(query);
+                        escaped = String.escapeSingleQuotes(escaped);
+                        // Wrap the individual term in quotes so logical operators work between them
+                        formattedQueries.add('\'' + escaped + '\''); 
+                    }
+                }
             }
 
-            System.debug('### SoslInvocableMethod Escaped Queries >>>'+ escapedQueries);
+            // 2. Join them with the OR operator
+            // Result looks like: 'Term1' OR 'Term2'
+            String queryString = String.join(formattedQueries, ' OR ');
 
-            // Build Query String
-            //String queryString = '\'' + String.join(req.queries, ' OR ') + '\'';
-            String queryString = '\'' + String.join(escapedQueries, ' OR ') + '\'';
-            System.debug('### SoslInvocableMethod execute queryString >>>'+queryString);
-
-            // Build SOSL
+            // 3. Build SOSL
+            // Result looks like: FIND {'Term1' OR 'Term2'} ...
             String sosl = String.format('FIND {0}{1} RETURNING {2}(Id{3})', new String[]{
                 queryString,
                 String.isNotBlank(req.scope) ? ' IN ' + req.scope : '',
                 req.objectAPIName,
                 String.isNotBlank(req.whereClause) ? ' WHERE ' + req.whereClause : ''
             });
-            System.debug('### SoslInvocableMethod execute sosl >>>'+sosl);
 
-            // Execute the SOSL search
+            System.debug('### SoslInvocableMethod execute sosl >>>' + sosl);
+
+            // 4. Execute Search
             Search.SearchResults searchResults = Search.find(sosl);
-            
-            // Get the list of SObject results
             List<Search.SearchResult> recordList = searchResults.get(req.objectAPIName);
 
-            // Get the record Id's if any
             Result res = new Result();
             res.recordIds = new List<Id>();
             for (Search.SearchResult searchResult : recordList) {
@@ -48,20 +47,19 @@ public with sharing class SoslInvocableMethod {
                 res.recordIds.add(record.Id);
             } 
 
-            // Add the response
             response.add(res);
         }
 
         return response;
     }
+
     @TestVisible
     private static String escapeSoslReservedChars(String input) {
         if (String.isBlank(input)) {
             return input;
         } 
-
         return input
-            .replace('\\', '\\\\')  // Backslash must be first
+            .replace('\\', '\\\\')
             .replace('?', '\\?')
             .replace('*', '\\*')
             .replace('&', '\\&')
@@ -80,18 +78,18 @@ public with sharing class SoslInvocableMethod {
     }
 
     public class Request {
-        @InvocableVariable(label='SObjectType' description='The SObjectType to execute the SOSL for' required=true)
+        @InvocableVariable(label='SObjectType' required=true)
         public String objectAPIName;
-        @InvocableVariable(label='Queries' description='A list of queries / search terms to apply to the SOSL search' required=true)
+        @InvocableVariable(label='Queries' required=true)
         public List<String> queries;
-        @InvocableVariable(label='Scope' description='The scope of the SOSL search (default ALL FIELDS)')
+        @InvocableVariable(label='Scope')
         public String scope;
-        @InvocableVariable(label='Where Clause' description='Include a custom where clause codition to filter the records even further')
+        @InvocableVariable(label='Where Clause')
         public String whereClause;
     }
 
     public class Result {
-        @InvocableVariable(label='Record Ids' description='The list of record Ids found relating to the search')
+        @InvocableVariable(label='Record Ids')
         public List<Id> recordIds;
     }
 }

@@ -54,7 +54,7 @@ public with sharing class SoslInvocableMethod {
 
         return response;
     }
-
+    @TestVisible
     private static String escapeSoslReservedChars(String input) {
         if (String.isBlank(input)) {
             return input;

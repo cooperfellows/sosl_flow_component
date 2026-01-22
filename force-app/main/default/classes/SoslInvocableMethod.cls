@@ -13,8 +13,8 @@ public with sharing class SoslInvocableMethod {
             // Sanitize and Escape our queries
             List<String> escapedQueries = new List<String>();
             for (String query : req.queries) {
-                String escaped = String.escapeSingleQuotes(query);
-                escaped = escapeSoslReservedChars(escaped);
+                String escaped = escapeSoslReservedChars(query);
+                escaped = String.escapeSingleQuotes(escaped);
                 escapedQueries.add(escaped);
             }
 

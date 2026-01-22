@@ -9,9 +9,20 @@ public with sharing class SoslInvocableMethod {
         for (Request req : requestList) {
 
             System.debug('### SoslInvocableMethod execute req >>>'+req);
+            
+            // Sanitize and Escape our queries
+            List<String> escapedQueries = new List<String>();
+            for (String query : req.queries) {
+                String escaped = String.escapeSingleQuotes(query);
+                escaped = escapeSoslReservedChars(escaped);
+                escapedQueries.add(escaped);
+            }
+
+            System.debug('### SoslInvocableMethod Escaped Queries >>>'+ escapedQueries);
 
             // Build Query String
-            String queryString = '\'' + String.join(req.queries, ' OR ') + '\'';
+            //String queryString = '\'' + String.join(req.queries, ' OR ') + '\'';
+            String queryString = '\'' + String.join(escapedQueries, ' OR ') + '\'';
             System.debug('### SoslInvocableMethod execute queryString >>>'+queryString);
 
             // Build SOSL
@@ -42,6 +53,30 @@ public with sharing class SoslInvocableMethod {
         }
 
         return response;
+    }
+
+    private static String escapeSoslReservedChars(String input) {
+        if (String.isBlank(input)) {
+            return input;
+        } 
+
+        return input
+            .replace('\\', '\\\\')  // Backslash must be first
+            .replace('?', '\\?')
+            .replace('*', '\\*')
+            .replace('&', '\\&')
+            .replace('|', '\\|')
+            .replace('!', '\\!')
+            .replace('{', '\\{')
+            .replace('}', '\\}')
+            .replace('[', '\\[')
+            .replace(']', '\\]')
+            .replace('(', '\\(')
+            .replace(')', '\\)')
+            .replace(':', '\\:')
+            .replace('^', '\\^')
+            .replace('~', '\\~')
+            .replace('"', '\\"');
     }
 
     public class Request {
